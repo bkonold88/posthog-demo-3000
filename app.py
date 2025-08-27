@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from flask import Flask, render_template, redirect, url_for, flash, request, jsonify, make_response
+from flask import Flask, render_template, redirect, url_for, flash, request, jsonify, make_response, session
 from config import DevelopmentConfig
 from models import db, User, Movie, MovieStats, BlogPost
 from forms import SignupForm, LoginForm, ChangePlanForm, BlogPostForm
@@ -27,6 +27,23 @@ migrate = Migrate(app, db)
 login = LoginManager(app)
 login.login_view = 'login'
 
+# --- LLM Chat setup (enabled when OPENAI_API_KEY is set) ---
+chat_enabled = bool(app.config.get('OPENAI_API_KEY'))
+openai_client = None
+openai_instrumented = False
+if chat_enabled:
+    try:
+        from posthog.ai.openai import OpenAI as PHOpenAI  # type: ignore
+        openai_client = PHOpenAI(api_key=app.config['OPENAI_API_KEY'], posthog_client=posthog)
+        openai_instrumented = True
+    except Exception:
+        try:
+            from openai import OpenAI as RawOpenAI  # type: ignore
+            openai_client = RawOpenAI(api_key=app.config['OPENAI_API_KEY'])
+        except Exception:
+            openai_client = None
+            chat_enabled = False
+
 @login.user_loader
 def load_user(id):
     return User.query.get(int(id))
@@ -40,7 +57,8 @@ def index():
     response = make_response(render_template(
         'index.html',
         family_movies=family_movies,
-        action_movies=action_movies
+        action_movies=action_movies,
+        chat_enabled=chat_enabled
     ))
 
     response.delete_cookie('posthog_js')
@@ -254,6 +272,74 @@ def toc():
 @login_required  # Optional: restrict to logged-in users only
 def feature_flags():
     return render_template('feature_flags.html')
+
+# --- Chat routes ---
+@app.route('/chat', methods=['GET'])
+def chat_page():
+    if not chat_enabled:
+        return redirect(url_for('index'))
+    return render_template('chat.html', chat_enabled=chat_enabled)
+
+
+@app.route('/chat', methods=['POST'])
+@csrf.exempt
+def chat_api():
+    if not chat_enabled or openai_client is None:
+        return jsonify({ 'error': 'Chat disabled' }), 400
+
+    user_message = (request.get_json() or {}).get('message') or request.form.get('message')
+    if not user_message:
+        return jsonify({ 'error': 'Message required' }), 400
+
+    distinct_id = current_user.email if current_user.is_authenticated else request.remote_addr or 'anonymous'
+
+    try:
+        # Prefer the new Responses API name; fall back if necessary
+        if hasattr(openai_client, 'responses'):
+            resp = openai_client.responses.create(
+                model="gpt-4o-mini",
+                input=[{"role": "user", "content": user_message}],
+                **({"posthog_distinct_id": distinct_id} if openai_instrumented else {})
+            )
+            # OpenAI responses API structure
+            ai_text = None
+            try:
+                ai_text = resp.output_text  # posthog wrapper may expose this helper
+            except Exception:
+                # Fallback parsing
+                choice = getattr(resp, 'choices', [{}])[0] if hasattr(resp, 'choices') else None
+                ai_text = (choice.get('message', {}) or {}).get('content') if isinstance(choice, dict) else None
+        else:
+            # Legacy chat.completions path
+            completion = openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": user_message}],
+            )
+            ai_text = completion.choices[0].message.content
+
+        if not ai_text:
+            ai_text = "(no response)"
+
+        # Capture a basic generation event for visibility even without wrapper
+        try:
+            posthog.capture(
+                distinct_id,
+                event='$ai_generation',
+                properties={
+                    '$ai_model': 'gpt-4o-mini',
+                    '$ai_provider': 'openai',
+                    '$ai_input': user_message,
+                    '$ai_output': ai_text,
+                    '$ai_trace_id': request.headers.get('X-Request-Id') or None,
+                }
+            )
+        except Exception:
+            pass
+
+        return jsonify({ 'message': ai_text })
+    except Exception as e:
+        app.logger.exception('Chat API error')
+        return jsonify({ 'error': 'Failed to generate response' }), 500
 
 if __name__ == '__main__':
     # app.run(debug=True, host=app.config['APP_HOST'], port=app.config['APP_PORT'])
