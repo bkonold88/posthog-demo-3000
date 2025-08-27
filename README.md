@@ -32,7 +32,7 @@ python dummy_data.py
 
 This only needs to be done the first time you run the app.
 
-Next, set your PostHog Host and Project API key as environment variables. You can either rename `.env.example` to `.env` and update the placeholder variables therein, or run the following:
+Next, set your PostHog Host and Project API key as environment variables. You can either rename `.env.example` to `.env` and update the placeholder variables therein (recommended), or run the following:
 
 ```bash
 export PH_HOST='https://<eu or us>.i.posthog.com'
@@ -46,6 +46,12 @@ python app.py
 ```
 
 If you open up a browser and head to `http://127.0.0.1:5000/`, you'll see the HogFlix app running. Use `Ctrl + C` in your terminal to stop the app.
+
+Alternatively, after updating `.env`, you can use the Makefile to bootstrap everything in one step:
+
+```bash
+make run
+```
 
 ### Option 2 - Run as a Container with Docker
 
@@ -125,10 +131,10 @@ You'll need a **Personal API Key** (available in `/settings/user-api-keys` in th
 make artifacts
 ```
 This script now reads `PH_PERSONAL_API_KEY`, `PH_HOST`, and `PH_PROJECT_ID` from your `.env`.
-
-The input parameters are:
-- `-k`: Your Personal API key.
-- `-p`: The API Endpoint for your PostHog Project.
+Optional flags (overrides env when provided):
+- `-k`: Personal API key
+- `-p`: API base URL (e.g. `https://us.posthog.com/api/projects/<project id>`) 
+- `--project_id`: Project ID (used to derive API URL when `-p` not provided)
 
 ## Recreate the Seed Data
 
@@ -143,11 +149,12 @@ python scripts/generate_fake_names_and_emails.py
 Common tasks are wrapped in a `Makefile`:
 
 - `make install`: Install dependencies
-- `make env`: Create `.env` from example and inject `PH_*` if set
+- `make env`: Create `.env` from example
+- `make check-env`: Verify `.env` placeholders have been replaced
 - `make db`: Initialize and seed local DB
-- `make run`: Run the Flask app
-- `make seed`: Seed historical events to PostHog (requires `PH_*`)
-- `make artifacts`: Create PostHog demo artifacts (requires `PERSONAL_API_KEY` and `POSTHOG_API_BASE_URL`)
+- `make run`: Verify env, init DB, seed data, create artifacts, run app
+- `make seed`: Seed historical events to PostHog (reads `PH_*` from `.env`; flags optional)
+- `make artifacts`: Create PostHog demo artifacts (reads `PH_*` from `.env`; idempotent)
 - `make test`: Run tests
 
 Then copy the generated file back to the `scripts/` folder to generate more demo data.
