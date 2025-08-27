@@ -77,22 +77,22 @@ To get started:
 
 This will create a virtual environment in your browser where you can run the app and make changes. It may take a few minutes for the environment to configure, but once done, everything will be set up automatically.
 
-You can optionally pass environment variables when creating the Codespace so your `.env` is created automatically:
-
-- `PH_PROJECT_KEY`: Your PostHog Project API key
-- `PH_HOST`: Your PostHog host, e.g. `https://us.i.posthog.com` or `https://eu.i.posthog.com`
-
 On creation, the devcontainer will:
 
 - Install dependencies
-- Create `.env` from `.env.example` (injecting the provided `PH_*` values if present)
-- Initialize the local database and seed dummy stats
-- If `PH_*` are provided, also run the historical event seeding script
+- Create `.env` from `.env.example`
 
-Run the app:
+Next steps (one-time):
+1) Open `.env` and replace the placeholder values for:
+   - `PH_HOST`
+   - `PH_PROJECT_KEY`
+   - `PH_PERSONAL_API_KEY`
+   - `PH_PROJECT_ID`
+2) Run the app and bootstrap everything in one step:
 ```bash
 make run
 ```
+This will verify your `.env` is updated, initialize the local DB, seed historical data into PostHog, create demo artifacts in your project, and then start the app.
 
 ## Seed Historic Usage Data
 
@@ -122,8 +122,9 @@ Once historic data has been generated, you'll need some PostHog artifacts to vie
 You'll need a **Personal API Key** (available in `/settings/user-api-keys` in the PostHog UI) to run this script:
 
 ```bash
-PERSONAL_API_KEY=<Personal API Key> POSTHOG_API_BASE_URL="https://<eu or us>.posthog.com/api/projects/<project id>" make artifacts
+make artifacts
 ```
+This script now reads `PH_PERSONAL_API_KEY`, `PH_HOST`, and `PH_PROJECT_ID` from your `.env`.
 
 The input parameters are:
 - `-k`: Your Personal API key.

@@ -1,18 +1,37 @@
 import requests
 from argparse import ArgumentParser
+import os
+from dotenv import load_dotenv
+from pathlib import Path
 
 parser = ArgumentParser()
 parser.add_argument("-k", "--personal_api_key",
-                    help="PostHog Personal API Key", required=True)
+                    help="PostHog Personal API Key", required=False)
 parser.add_argument("-p", "--posthog_api_base_url",
-                    help="PostHog API Host", required=True)
+                    help="PostHog API Host", required=False)
+parser.add_argument("--project_id", help="PostHog Project Id", required=False)
 args = parser.parse_args()
 
+# Load env from project root
+project_root_env = Path(__file__).resolve().parents[1] / '.env'
+if project_root_env.exists():
+    load_dotenv(dotenv_path=project_root_env)
+
+personal_api_key = args.personal_api_key or os.getenv('PH_PERSONAL_API_KEY')
+project_id = args.project_id or os.getenv('PH_PROJECT_ID')
+host = os.getenv('PH_HOST')
+if not personal_api_key:
+    raise SystemExit('PH_PERSONAL_API_KEY must be set in env or passed via -k')
+if not project_id:
+    raise SystemExit('PH_PROJECT_ID must be set in env or passed via --project_id')
+if not host:
+    raise SystemExit('PH_HOST must be set in env')
+
 # The URL to which you want to send the POST request
-url = args.posthog_api_base_url
+url = args.posthog_api_base_url or f"{host.replace('.i.posthog.com','.posthog.com')}/api/projects/{project_id}"
 
 # The Bearer token for authentication
-token = args.personal_api_key
+token = personal_api_key
 
 # Headers including the Bearer token for authorization
 headers = {

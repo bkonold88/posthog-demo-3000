@@ -1,9 +1,5 @@
 {
     "image": "mcr.microsoft.com/devcontainers/universal:2",
     "postCreateCommand": "bash .devcontainer/postCreate.sh",
-    "forwardPorts": [5000],
-    "containerEnv": {
-        "PH_PROJECT_KEY": "${localEnv:PH_PROJECT_KEY}",
-        "PH_HOST": "${localEnv:PH_HOST}"
-    }
+    "forwardPorts": [5000]
 }

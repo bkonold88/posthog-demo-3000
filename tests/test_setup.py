@@ -21,3 +21,11 @@ def test_config_env_defaults(monkeypatch):
         sys.path.insert(0, str(project_root))
     from config import Config
     assert Config.PH_HOST.startswith('https://')
+
+
+def test_env_example_contains_required_keys():
+    env_example = (Path(__file__).resolve().parents[1] / '.env.example').read_text()
+    assert "PH_HOST='https://<eu or us>.i.posthog.com'" in env_example
+    assert "PH_PROJECT_KEY='<Project API key>'" in env_example
+    assert "PH_PERSONAL_API_KEY='<Personal API key>'" in env_example
+    assert "PH_PROJECT_ID='<Project Id>'" in env_example
