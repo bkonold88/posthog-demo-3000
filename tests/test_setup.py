@@ -24,8 +24,12 @@ def test_config_env_defaults(monkeypatch):
 
 
 def test_env_example_contains_required_keys():
-    env_example = (Path(__file__).resolve().parents[1] / '.env.example').read_text()
-    assert "PH_HOST='https://<eu or us>.i.posthog.com'" in env_example
-    assert "PH_PROJECT_KEY='<Project API key>'" in env_example
-    assert "PH_PERSONAL_API_KEY='<Personal API key>'" in env_example
-    assert "PH_PROJECT_ID='<Project Id>'" in env_example
+    env_path = Path(__file__).resolve().parents[1] / '.env.example'
+    content = env_path.read_text().strip().splitlines()
+    expected = {
+        "PH_HOST='https://<eu or us>.i.posthog.com'",
+        "PH_PROJECT_KEY='<Project API key>'",
+        "PH_PERSONAL_API_KEY='<Personal API key>'",
+        "PH_PROJECT_ID='<Project Id>'",
+    }
+    assert set(content) == expected
