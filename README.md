@@ -71,6 +71,22 @@ docker run -d -p 5000:5000 -e PH_PROJECT_KEY=<Project API key> -e PH_HOST='https
 
 You can then access the app on `localhost:5000`.
 
+### Optional: Enable the built-in Chat (LLM) demo
+
+If you set an OpenAI API key, the app will enable a simple chat interface that is instrumented with PostHog LLM Analytics (Generations and Traces). This lets you explore the LLM Analytics features alongside the seeded demo data.
+
+1. Add the following to your `.env`:
+
+```
+OPENAI_API_KEY='<OpenAI API key>'
+```
+
+2. Ensure your PostHog environment variables are set as above. The chat will appear in the navbar as “Chat” when `OPENAI_API_KEY` is present.
+
+Notes:
+- The app will attempt to use the PostHog-instrumented OpenAI client automatically. If unavailable, it will fall back to the standard OpenAI client while still capturing a `$ai_generation` event per message.
+- Models: defaults to `gpt-4o-mini`. You can change this in `app.py`.
+
 ### Option 3 - Run in GitHub Codespaces
 
 For a seamless setup, you can run the demo entirely in your browser using **GitHub Codespaces**. This avoids needing to manage Python or Docker on your local machine.

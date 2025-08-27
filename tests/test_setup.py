@@ -31,5 +31,6 @@ def test_env_example_contains_required_keys():
         "PH_PROJECT_KEY='<Project API key>'",
         "PH_PERSONAL_API_KEY='<Personal API key>'",
         "PH_PROJECT_ID='<Project Id>'",
+        "OPENAI_API_KEY='<OpenAI API key>'",
     }
     assert set(content) == expected
