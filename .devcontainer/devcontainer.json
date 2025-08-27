@@ -1,4 +1,9 @@
 {
-    "image":"mcr.microsoft.com/devcontainers/universal:2",
-    "postCreateCommand": "pip install -r requirements.txt && python pop_db.py && python dummy_data.py"
+    "image": "mcr.microsoft.com/devcontainers/universal:2",
+    "postCreateCommand": "bash .devcontainer/postCreate.sh",
+    "forwardPorts": [5000],
+    "containerEnv": {
+        "PH_PROJECT_KEY": "${localEnv:PH_PROJECT_KEY}",
+        "PH_HOST": "${localEnv:PH_HOST}"
+    }
 }

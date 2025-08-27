@@ -77,29 +77,36 @@ To get started:
 
 This will create a virtual environment in your browser where you can run the app and make changes. It may take a few minutes for the environment to configure, but once done, everything will be set up automatically.
 
-Once the environment is ready, follow these steps:
-1. Copy the contents of `.env.example` and create a new `.env` file.
-2. Set the required environment variables, including your **PostHog Project API Key**.
-3. Run the app:
-   ```bash
-   python app.py
-   ```
+You can optionally pass environment variables when creating the Codespace so your `.env` is created automatically:
 
-Now you can demo **HogFlix** entirely in your browser without switching between local environments or desktop apps.
+- `PH_PROJECT_KEY`: Your PostHog Project API key
+- `PH_HOST`: Your PostHog host, e.g. `https://us.i.posthog.com` or `https://eu.i.posthog.com`
+
+On creation, the devcontainer will:
+
+- Install dependencies
+- Create `.env` from `.env.example` (injecting the provided `PH_*` values if present)
+- Initialize the local database and seed dummy stats
+- If `PH_*` are provided, also run the historical event seeding script
+
+Run the app:
+```bash
+make run
+```
 
 ## Seed Historic Usage Data
 
 To generate valuable insights in your PostHog project, you'll need to add some historic event data. The `seed_demo_data.py` script creates pseudo-random data that mimics real usage of the HogFlix app. You'll need the `500_names_and_emails.csv` in your `scripts` folder (see below on how to generate this), and then run:
 
 ```bash
-python scripts/seed_demo_data.py -k <Project API Key> -p https://<eu or us>.i.posthog.com -d 30 -i 100
+make seed DAYS=30 ITER=100
 ```
 
-The input parameters are:
-- `-k`: The Project API key for your demo project.
-- `-h`: The PostHog Host.
-- `-d`: The number of previous days to generate data over (optional, defaults to 30).
-- `-i`: The number of iterations for the script (optional, defaults to 100).
+The seeding script will read `PH_PROJECT_KEY` and `PH_HOST` from either your environment or your `.env`. You can still pass `-k` and `-p` flags explicitly if you prefer.
+
+Parameters:
+- `-d`: Number of previous days to generate (default 30)
+- `-i`: Number of iterations (default 100)
 
 After a few minutes, you'll see newly created events and people in your PostHog project.
 
@@ -115,7 +122,7 @@ Once historic data has been generated, you'll need some PostHog artifacts to vie
 You'll need a **Personal API Key** (available in `/settings/user-api-keys` in the PostHog UI) to run this script:
 
 ```bash
-python scripts/create_posthog_artifacts.py -p "https://<eu or us>.posthog.com/api/projects/<project id>" -k "<Personal API Key>"
+PERSONAL_API_KEY=<Personal API Key> POSTHOG_API_BASE_URL="https://<eu or us>.posthog.com/api/projects/<project id>" make artifacts
 ```
 
 The input parameters are:
@@ -129,6 +136,18 @@ The `500_names_and_emails.csv` file in the `scripts/` folder contains dummy data
 ```bash
 python scripts/generate_fake_names_and_emails.py
 ```
+
+## Makefile Shortcuts
+
+Common tasks are wrapped in a `Makefile`:
+
+- `make install`: Install dependencies
+- `make env`: Create `.env` from example and inject `PH_*` if set
+- `make db`: Initialize and seed local DB
+- `make run`: Run the Flask app
+- `make seed`: Seed historical events to PostHog (requires `PH_*`)
+- `make artifacts`: Create PostHog demo artifacts (requires `PERSONAL_API_KEY` and `POSTHOG_API_BASE_URL`)
+- `make test`: Run tests
 
 Then copy the generated file back to the `scripts/` folder to generate more demo data.
 

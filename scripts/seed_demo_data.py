@@ -5,6 +5,9 @@ from argparse import ArgumentParser
 import random
 import csv
 from argparse import ArgumentParser
+from pathlib import Path
+import os
+from dotenv import load_dotenv
 
 days_to_generate = 30
 number_of_iterations = 100
@@ -15,10 +18,23 @@ parser.add_argument("-d", "--number_of_days",
 parser.add_argument("-i", "--number_of_iterations",
                     help="Number of iterations of the data generator",default=100, required=False)
 parser.add_argument("-k", "--posthog_api_key",
-                    help="PostHog Project API Key", required=True)
+                    help="PostHog Project API Key", required=False)
 parser.add_argument("-p", "--posthog_host",
-                    help="PostHog Host", required=True)
+                    help="PostHog Host", required=False)
 args = parser.parse_args()
+
+# Load .env from project root to support Codespaces/devcontainer auto-creation
+project_root_env = Path(__file__).resolve().parents[1] / '.env'
+if project_root_env.exists():
+  load_dotenv(dotenv_path=project_root_env)
+
+# Fallback to environment variables if CLI params not provided
+if not args.posthog_api_key:
+  args.posthog_api_key = os.getenv("PH_PROJECT_KEY")
+if not args.posthog_host:
+  args.posthog_host = os.getenv("PH_HOST")
+if not args.posthog_api_key or not args.posthog_host:
+  raise SystemExit("PH_PROJECT_KEY and PH_HOST must be provided via flags or environment variables.")
 
 # PostHog Python Client
 posthog = Posthog(args.posthog_api_key, 
@@ -30,7 +46,8 @@ posthog = Posthog(args.posthog_api_key,
 
 fake = Faker() 
 
-with open('500_names_and_emails.csv', newline='') as csvfile:
+csv_path = Path(__file__).resolve().parent / '500_names_and_emails.csv'
+with open(csv_path, newline='') as csvfile:
     csvreader = csv.DictReader(csvfile, delimiter=',')
     fake_users = [row for row in csvreader]
 
