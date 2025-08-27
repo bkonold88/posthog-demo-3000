@@ -1,6 +1,6 @@
 SHELL := /usr/bin/bash
 
-.PHONY: help install env db run seed artifacts test lint clean check-env
+.PHONY: help install env env-reset db run seed artifacts test lint clean check-env
 
 help:
 	@echo "Common targets:"
@@ -19,6 +19,9 @@ install:
 
 env:
 	@if [ ! -f .env ]; then cp .env.example .env; fi
+
+env-reset:
+	cp .env.example .env
 
 check-env:
 	@grep -q "PH_HOST='https://<eu or us>.i.posthog.com'" .env && { echo "Please update PH_HOST in .env"; exit 1; } || true
