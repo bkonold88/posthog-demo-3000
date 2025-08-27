@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+from urllib.parse import quote
 
 parser = ArgumentParser()
 parser.add_argument("-k", "--personal_api_key",
@@ -419,43 +420,78 @@ feature_flag_data = {
 
 def make_posthog_api_request(endpoint, data):
     response = requests.post(url + endpoint, headers=headers, json=data)
-    # Checking the status code and response
     if response.status_code == 201:
-        print("Request was successful!")
-        print("Response:", response.json())  # Assuming the response is JSON
-    else:
-        print(f"Request failed with status code {response.status_code}")
-        print("Response:", response.text)
-    return response.json()
+        return response.json()
+    print(f"Request failed with status code {response.status_code}")
+    print("Response:", response.text)
+    try:
+        return response.json()
+    except Exception:
+        return None
+
+
+def get_existing_by(endpoint, match_key, match_value):
+    try:
+        resp = requests.get(url + endpoint + f"?search={quote(str(match_value))}", headers=headers)
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        items = data.get('results', data if isinstance(data, list) else [])
+        for item in items:
+            if item.get(match_key) == match_value:
+                return item
+    except Exception:
+        return None
+    return None
 
 # Making the POST request
 
 for data in actions_data:
+    # Try to find existing action by name
+    existing = get_existing_by(actions_endpoint, 'name', data['name'])
+    if existing:
+        actions_ids[data['name']] = existing['id']
+        continue
     response = make_posthog_api_request(actions_endpoint, data)
-    actions_ids[data['name']] = response['id']
+    if response and 'id' in response:
+        actions_ids[data['name']] = response['id']
 
 cohorts_data[1]['filters']['properties']['values'][0]['values'][0]['key'] =  actions_ids.get('Watched a movie')
 cohorts_data[2]['filters']['properties']['values'][0]['values'][0]['key'] =  actions_ids.get('Watched a movie')
 
 for data in cohorts_data:
+    existing = get_existing_by(cohorts_endpoint, 'name', data['name'])
+    if existing:
+        cohorts_ids[data['name']] = existing['id']
+        continue
     response = make_posthog_api_request(cohorts_endpoint, data)
-    cohorts_ids[data['name']] = response['id']
+    if response and 'id' in response:
+        cohorts_ids[data['name']] = response['id']
 
 movie_views_trend_data['query']['source']['series'][0]['id'] = actions_ids.get('Watched a movie')
-response = make_posthog_api_request(insights_endpoint, movie_views_trend_data)
+existing_mv = get_existing_by(insights_endpoint, 'name', movie_views_trend_data['name'])
+if not existing_mv:
+    response = make_posthog_api_request(insights_endpoint, movie_views_trend_data)
 
 purchase_funnel_data['query']['source']['series'][3]['id'] = actions_ids.get('Paid Plan Purchase')
-response = make_posthog_api_request(insights_endpoint, purchase_funnel_data)
+existing_pf = get_existing_by(insights_endpoint, 'name', purchase_funnel_data['name'])
+if not existing_pf:
+    response = make_posthog_api_request(insights_endpoint, purchase_funnel_data)
 
 movie_retention_data['query']['source']['retentionFilter']['targetEntity']['id'] = actions_ids.get('Watched a movie')
 movie_retention_data['query']['source']['retentionFilter']['returningEntity']['id'] = actions_ids.get('Watched a movie')
 
-response = make_posthog_api_request(insights_endpoint, movie_retention_data)
+existing_ret = get_existing_by(insights_endpoint, 'name', movie_retention_data['name'])
+if not existing_ret:
+    response = make_posthog_api_request(insights_endpoint, movie_retention_data)
 
-response = make_posthog_api_request(insights_endpoint, path_data)
+existing_path = get_existing_by(insights_endpoint, 'name', path_data['name'])
+if not existing_path:
+    response = make_posthog_api_request(insights_endpoint, path_data)
 
 feature_flag_data['filters']['groups'][0]['properties'][0]['value'] = cohorts_ids.get('Adult Subscribers')
-
-response = make_posthog_api_request(feature_flag_endpoint, feature_flag_data)
+existing_ff = get_existing_by(feature_flag_endpoint, 'key', feature_flag_data['key'])
+if not existing_ff:
+    response = make_posthog_api_request(feature_flag_endpoint, feature_flag_data)
 
 
