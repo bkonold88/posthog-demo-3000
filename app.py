@@ -1,4 +1,5 @@
 import logging
+import uuid
 from datetime import datetime
 from flask import Flask, render_template, redirect, url_for, flash, request, jsonify, make_response, session
 from config import DevelopmentConfig
@@ -31,18 +32,29 @@ login.login_view = 'login'
 chat_enabled = bool(app.config.get('OPENAI_API_KEY'))
 openai_client = None
 openai_instrumented = False
+langchain_available = False
 if chat_enabled:
+    # Prefer LangChain for chat; fall back to direct OpenAI client
     try:
-        from posthog.ai.openai import OpenAI as PHOpenAI  # type: ignore
-        openai_client = PHOpenAI(api_key=app.config['OPENAI_API_KEY'], posthog_client=posthog)
-        openai_instrumented = True
+        from langchain_openai import ChatOpenAI  # type: ignore
+        from langchain_core.messages import SystemMessage, HumanMessage, AIMessage  # type: ignore
+        from posthog.ai.langchain import CallbackHandler  # type: ignore
+        langchain_available = True
     except Exception:
+        langchain_available = False
+
+    if not langchain_available:
         try:
-            from openai import OpenAI as RawOpenAI  # type: ignore
-            openai_client = RawOpenAI(api_key=app.config['OPENAI_API_KEY'])
+            from posthog.ai.openai import OpenAI as PHOpenAI  # type: ignore
+            openai_client = PHOpenAI(api_key=app.config['OPENAI_API_KEY'], posthog_client=posthog)
+            openai_instrumented = True
         except Exception:
-            openai_client = None
-            chat_enabled = False
+            try:
+                from openai import OpenAI as RawOpenAI  # type: ignore
+                openai_client = RawOpenAI(api_key=app.config['OPENAI_API_KEY'])
+            except Exception:
+                openai_client = None
+                chat_enabled = False
 
 @login.user_loader
 def load_user(id):
@@ -284,41 +296,89 @@ def chat_page():
 @app.route('/chat', methods=['POST'])
 @csrf.exempt
 def chat_api():
-    if not chat_enabled or openai_client is None:
+    if not chat_enabled:
         return jsonify({ 'error': 'Chat disabled' }), 400
 
     user_message = (request.get_json() or {}).get('message') or request.form.get('message')
     if not user_message:
         return jsonify({ 'error': 'Message required' }), 400
 
+    # Establish a stable conversation id for analytics and memory
+    if 'conversation_id' not in session:
+        session['conversation_id'] = uuid.uuid4().hex
+    conversation_id = session['conversation_id']
+
     distinct_id = current_user.email if current_user.is_authenticated else request.remote_addr or 'anonymous'
 
     try:
-        # Prefer the new Responses API name; fall back if necessary
-        if hasattr(openai_client, 'responses'):
-            resp = openai_client.responses.create(
+        ai_text = None
+        if 'history' not in session:
+            session['history'] = []
+
+        if langchain_available:
+            # Build chat history for LangChain
+            lc_messages = [
+                SystemMessage(content=(
+                    "You are HogFlix's helpful assistant. Keep answers concise and use GitHub-Flavored Markdown. "
+                    "When appropriate, include code blocks fenced with the correct language."
+                ))
+            ]
+            for m in session['history']:
+                role = m.get('role')
+                content = m.get('content')
+                if role == 'user':
+                    lc_messages.append(HumanMessage(content=content))
+                elif role == 'assistant':
+                    lc_messages.append(AIMessage(content=content))
+            lc_messages.append(HumanMessage(content=user_message))
+
+            model = ChatOpenAI(
                 model="gpt-4o-mini",
-                input=[{"role": "user", "content": user_message}],
-                **({"posthog_distinct_id": distinct_id} if openai_instrumented else {})
+                api_key=app.config['OPENAI_API_KEY'],
+                temperature=0.2,
             )
-            # OpenAI responses API structure
-            ai_text = None
+
+            # PostHog LangChain callback for detailed analytics
             try:
-                ai_text = resp.output_text  # posthog wrapper may expose this helper
+                callback_handler = CallbackHandler(
+                    client=posthog,
+                    distinct_id=distinct_id,
+                    trace_id=conversation_id,
+                    properties={"conversation_id": conversation_id},
+                )
+                result = model.invoke(lc_messages, config={"callbacks": [callback_handler]})
             except Exception:
-                # Fallback parsing
-                choice = getattr(resp, 'choices', [{}])[0] if hasattr(resp, 'choices') else None
-                ai_text = (choice.get('message', {}) or {}).get('content') if isinstance(choice, dict) else None
+                result = model.invoke(lc_messages)
+
+            ai_text = getattr(result, 'content', None) or str(result)
         else:
-            # Legacy chat.completions path
-            completion = openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": user_message}],
-            )
-            ai_text = completion.choices[0].message.content
+            if openai_client is None:
+                return jsonify({ 'error': 'Chat disabled' }), 400
+            # Fallback to direct OpenAI client
+            if hasattr(openai_client, 'responses'):
+                resp = openai_client.responses.create(
+                    model="gpt-4o-mini",
+                    input=[{"role": "user", "content": user_message}],
+                    **({"posthog_distinct_id": distinct_id} if openai_instrumented else {})
+                )
+                try:
+                    ai_text = resp.output_text
+                except Exception:
+                    choice = getattr(resp, 'choices', [{}])[0] if hasattr(resp, 'choices') else None
+                    ai_text = (choice.get('message', {}) or {}).get('content') if isinstance(choice, dict) else None
+            else:
+                completion = openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": user_message}],
+                )
+                ai_text = completion.choices[0].message.content
 
         if not ai_text:
             ai_text = "(no response)"
+
+        # Update session history
+        session['history'].append({"role": "user", "content": user_message})
+        session['history'].append({"role": "assistant", "content": ai_text})
 
         # Capture a basic generation event for visibility even without wrapper
         try:
@@ -330,7 +390,7 @@ def chat_api():
                     '$ai_provider': 'openai',
                     '$ai_input': user_message,
                     '$ai_output': ai_text,
-                    '$ai_trace_id': request.headers.get('X-Request-Id') or None,
+                    '$ai_trace_id': conversation_id,
                 }
             )
         except Exception:

@@ -19,16 +19,50 @@
 {% endblock %}
 
 {% block scripts %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.7/purify.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
+    marked.setOptions({
+        gfm: true,
+        breaks: true
+    });
+
     const chatWindow = document.getElementById('chat-window');
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
 
-    function appendMessage(author, text) {
-        const div = document.createElement('div');
-        div.className = 'mb-2';
-        div.innerHTML = `<strong>${author}:</strong> ${text}`;
-        chatWindow.appendChild(div);
+    function renderMarkdown(md) {
+        const rawHtml = marked.parse(md || '');
+        const safeHtml = DOMPurify.sanitize(rawHtml);
+        const container = document.createElement('div');
+        container.innerHTML = safeHtml;
+        container.querySelectorAll('pre code').forEach((el) => {
+            try { hljs.highlightElement(el); } catch (_) {}
+        });
+        return container;
+    }
+
+    function appendMessage(author, text, isMarkdown = false) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mb-3';
+
+        const header = document.createElement('div');
+        header.className = 'font-weight-bold mb-1';
+        header.textContent = `${author}:`;
+        wrapper.appendChild(header);
+
+        const body = document.createElement('div');
+        if (isMarkdown) {
+            const rendered = renderMarkdown(text);
+            body.appendChild(rendered);
+        } else {
+            body.textContent = text;
+        }
+        wrapper.appendChild(body);
+
+        chatWindow.appendChild(wrapper);
         chatWindow.scrollTop = chatWindow.scrollHeight;
     }
 
@@ -36,7 +70,7 @@
         e.preventDefault();
         const message = chatInput.value.trim();
         if (!message) return;
-        appendMessage('You', message);
+        appendMessage('You', message, false);
         chatInput.value = '';
         try {
             const res = await fetch("{{ url_for('chat_api') }}", {
@@ -46,7 +80,7 @@
             });
             const data = await res.json();
             if (data && data.message) {
-                appendMessage('Assistant', data.message);
+                appendMessage('Assistant', data.message, true);
             } else if (data && data.error) {
                 appendMessage('System', data.error);
             } else {
