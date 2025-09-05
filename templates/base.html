@@ -118,13 +118,36 @@
         </div>
     </footer>
 
+    <!-- Purchase Confirmation Modal -->
+    <div class="modal fade" id="phPurchaseModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="phPurchaseModalLabel">Confirm</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p id="phPurchaseModalText">Are you sure?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="phPurchaseConfirmBtn">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.4.0/dist/confetti.browser.min.js"></script>
     <script src="{{ url_for('static', filename='js/confetti.js') }}"></script>
     <script>
-        // Global handler for Buy/Rent buttons to capture revenue events
+        // Intent -> confirm flow for Buy/Rent with revenue on complete
+        var phPendingPurchase = null;
+
         document.addEventListener('click', function(e) {
             var target = e.target;
             if (!target) { return; }
@@ -136,21 +159,72 @@
                     var price = parseFloat(target.getAttribute('data-price')) || 0; // dollars
                     var currency = target.getAttribute('data-currency') || 'USD';
 
-                    // Convert to minor units per PostHog revenue analytics docs
-                    var valueMinorUnits = Math.round(price * 100);
-
-                    posthog.capture('movie_' + actionType, {
+                    // Emit intent (no revenue aggregation here)
+                    posthog.capture('movie_' + actionType + '_intent', {
                         movie_id: movieId,
                         movie_title: movieTitle,
                         action: actionType,
-                        value: valueMinorUnits,
+                        price: price,
                         currency: currency
                     });
+
+                    // Prepare modal
+                    var modalTitle = actionType === 'buy' ? 'Confirm Purchase' : 'Confirm Rental';
+                    var modalText = (actionType === 'buy' ? 'Purchase' : 'Rent') + ' "' + movieTitle + '" for $' + price.toFixed(2) + '?';
+                    var titleEl = document.getElementById('phPurchaseModalLabel');
+                    var textEl = document.getElementById('phPurchaseModalText');
+                    if (titleEl) { titleEl.textContent = modalTitle; }
+                    if (textEl) { textEl.textContent = modalText; }
+
+                    // Store pending purchase for confirm
+                    phPendingPurchase = {
+                        movieId: movieId,
+                        movieTitle: movieTitle,
+                        actionType: actionType,
+                        price: price,
+                        currency: currency,
+                        valueMinorUnits: Math.round(price * 100)
+                    };
+
+                    // Show modal
+                    if (window.jQuery && jQuery.fn && jQuery.fn.modal) {
+                        jQuery('#phPurchaseModal').modal('show');
+                    }
                 } catch (err) {
                     // no-op
                 }
             }
         }, false);
+
+        // Confirm button handler
+        (function() {
+            var confirmBtn = document.getElementById('phPurchaseConfirmBtn');
+            if (!confirmBtn) { return; }
+            confirmBtn.addEventListener('click', function() {
+                if (!phPendingPurchase) { return; }
+                try {
+                    var p = phPendingPurchase;
+                    posthog.capture('movie_' + p.actionType + '_complete', {
+                        movie_id: p.movieId,
+                        movie_title: p.movieTitle,
+                        action: p.actionType,
+                        value: p.valueMinorUnits,
+                        currency: p.currency
+                    });
+                } catch (err) {
+                    // no-op
+                }
+
+                // Optional celebration
+                try { if (typeof launchConfetti === 'function') { launchConfetti(); } } catch (e) {}
+
+                // Close modal and clear state
+                if (window.jQuery && jQuery.fn && jQuery.fn.modal) {
+                    jQuery('#phPurchaseModal').modal('hide');
+                }
+                phPendingPurchase = null;
+            });
+        })();
     </script>
     {% block scripts %}{% endblock %}
 </body>
