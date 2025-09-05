@@ -56,7 +56,7 @@
     <h1>Our Awesome Subscriptions</h1>
     <div class="row">
         <div class="col-md-4">
-            <a href="{{ url_for('signup', plan='Free') }}" class="text-decoration-none">
+            <a href="{{ url_for('signup', preselected_plan='Free') }}&prefill=1" class="text-decoration-none">
                 <div class="card text-center plan-card" id="card_free">
                     <img src="{{ url_for('static', filename='images/free_plan.png') }}" class="card-img-top" alt="Free Plan">
                     <div class="card-body">
@@ -68,7 +68,7 @@
             </a>
         </div>
         <div class="col-md-4">
-            <a href="{{ url_for('signup', plan='Premium') }}" class="text-decoration-none">
+            <a href="{{ url_for('signup', preselected_plan='Premium') }}&prefill=1" class="text-decoration-none">
                 <div class="card text-center plan-card" id="card_premium">
                     <img src="{{ url_for('static', filename='images/premium_plan.png') }}" class="card-img-top" alt="Premium Plan">
                     <div class="card-body">
@@ -80,7 +80,7 @@
             </a>
         </div>
         <div class="col-md-4">
-            <a href="/nowhere.html" class="text-decoration-none">
+            <a href="{{ url_for('signup', preselected_plan='Max-imal') }}&prefill=1" class="text-decoration-none">
                 <div class="card text-center plan-card" id="card_maximal">
                     <img src="{{ url_for('static', filename='images/max_imal_plan.png') }}" class="card-img-top" alt="Max-imal Plan">
                     <div class="card-body">
