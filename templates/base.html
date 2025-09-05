@@ -121,19 +121,23 @@
     <!-- Purchase Confirmation Modal -->
     <div class="modal fade" id="phPurchaseModal" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="phPurchaseModalLabel">Confirm</h5>
+            <div class="modal-content ph-modal">
+                <div class="modal-header ph-modal-header">
+                    <h5 class="modal-title" id="phPurchaseModalLabel"><i class="fas fa-film"></i> Hogflix Checkout</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <div class="modal-body">
-                    <p id="phPurchaseModalText">Are you sure?</p>
+                <div class="modal-body ph-modal-body">
+                    <div class="text-center">
+                        <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Hogflix Logo" style="height: 48px; margin-bottom: 12px;">
+                        <p id="phPurchaseModalText" style="margin: 0;">Ready to enjoy this blockbuster?</p>
+                        <small class="text-muted">We’ll only charge you when you confirm.</small>
+                    </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer ph-modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-success" id="phPurchaseConfirmBtn">Confirm</button>
+                    <button type="button" class="btn btn-danger" id="phPurchaseConfirmBtn"><i class="fas fa-check"></i> Confirm</button>
                 </div>
             </div>
         </div>
@@ -144,6 +148,12 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.4.0/dist/confetti.browser.min.js"></script>
     <script src="{{ url_for('static', filename='js/confetti.js') }}"></script>
+    <style>
+        .ph-modal { background-color: #111; color: #fff; border: 1px solid #e50914; }
+        .ph-modal-header { border-bottom: 1px solid #e50914; }
+        .ph-modal-footer { border-top: 1px solid #e50914; }
+        .ph-modal .modal-title { color: #e50914; }
+    </style>
     <script>
         // Intent -> confirm flow for Buy/Rent with revenue on complete
         var phPendingPurchase = null;
