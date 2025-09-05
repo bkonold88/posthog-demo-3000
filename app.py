@@ -122,13 +122,21 @@ def signup():
                     'date_time': formatted_time
                 }
             )
-            posthog.capture(form.email.data, 
-                event= "plan_purchase", 
-                properties = {
-                    'plan': plan,
-                    'amount': PLAN_PRICES.get(plan, 0)  # Returns 0 if plan not found
-                }
-            )
+            # Subscription purchase event for Revenue Analytics
+            try:
+                months = 1
+                price_dollars = PLAN_PRICES.get(plan, 0)
+                posthog.capture(form.email.data,
+                    event='subscription_purchased',
+                    properties={
+                        'plan': plan,
+                        'months': months,
+                        'price': int(round(price_dollars * 100)),
+                        'currency': 'USD'
+                    }
+                )
+            except Exception:
+                pass
             flash('Congratulations, you are now a registered user!')
             return redirect(url_for('login'))
         else:

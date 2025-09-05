@@ -235,6 +235,24 @@
                 phPendingPurchase = null;
             });
         })();
+
+        // Plan subscribe helpers: send subscription intent and purchase on submit
+        document.addEventListener('click', function(e) {
+            var el = e.target.closest('a[href*="/signup"]');
+            if (!el) { return; }
+            try {
+                var url = new URL(el.href, window.location.origin);
+                var plan = url.searchParams.get('preselected_plan') || 'Unknown';
+                var months = 1; // default monthly
+                var planPriceDollars = plan === 'Max-imal' ? 19.99 : plan === 'Premium' ? 9.99 : 0;
+                posthog.capture('subscription_intent', {
+                    plan: plan,
+                    months: months,
+                    price: Math.round(planPriceDollars * 100),
+                    currency: 'USD'
+                });
+            } catch (err) {}
+        }, false);
     </script>
     {% block scripts %}{% endblock %}
 </body>

@@ -290,6 +290,27 @@ def browse_plans_and_signup():
    print(client_properties)
    capture_event(event='plan_changed', extra_properties=client_properties, timestamp=timestamp, distinct_id=distinct_id, groups=groups)
 
+   # Emit subscription intent and purchase for Revenue Analytics
+   months = 1
+   price_dollars = 19.99 if new_plan == 'Max-imal' else 9.99 if new_plan == 'Premium' else 0
+   timestamp = timestamp + timedelta(minutes=1)
+   capture_event(event='subscription_intent', extra_properties={
+      **client_properties,
+      'plan': new_plan,
+      'months': months,
+      'price': int(round(price_dollars * 100)),
+      'currency': 'USD',
+   }, timestamp=timestamp, distinct_id=distinct_id, groups=groups)
+
+   timestamp = timestamp + timedelta(minutes=1)
+   capture_event(event='subscription_purchased', extra_properties={
+      **client_properties,
+      'plan': new_plan,
+      'months': months,
+      'price': int(round(price_dollars * 100)),
+      'currency': 'USD',
+   }, timestamp=timestamp, distinct_id=distinct_id, groups=groups)
+
 for i in range(int(args.number_of_iterations)):
    print(args)
    browse_and_watch_movie(number = 10)

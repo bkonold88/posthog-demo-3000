@@ -13,22 +13,22 @@
                         {{ form.hidden_tag() }}
                         <div class="form-group">
                             {{ form.username.label(class="form-control-label") }}
-                            {{ form.username(class="form-control input-field", accesskey="u") }}
+                            {{ form.username(class="form-control input-field", accesskey="u", id="ph_username") }}
                         </div>
                         <div class="form-group-email">
                             {{ form.email.label(class="form-control-label") }}
-                            {{ form.email(class="form-control input-field") }}
+                            {{ form.email(class="form-control input-field", id="ph_email") }}
                         </div>
                         <div class="form-group">
                             {{ form.password.label(class="form-control-label") }}
-                            {{ form.password(class="form-control input-field") }}
+                            {{ form.password(class="form-control input-field", id="ph_password") }}
                         </div>
                         <div class="form-group">
                             {{ form.password2.label(class="form-control-label") }}
-                            {{ form.password2(class="form-control input-field") }}
+                            {{ form.password2(class="form-control input-field", id="ph_password2") }}
                         </div>
                         <div class="form-group form-check">
-                            {{ form.is_adult(class="form-check-input") }}
+                            {{ form.is_adult(class="form-check-input", id="ph_is_adult") }}
                             {{ form.is_adult.label(class="form-check-label") }}
                         </div>
                         <input type="hidden" id="plan_input" name="plan" value="">
@@ -84,8 +84,19 @@
 
             const urlParams = new URLSearchParams(window.location.search);
             const preselectedPlan = urlParams.get('preselected_plan');
+            const prefill = urlParams.get('prefill');
             if (preselectedPlan) {
                 selectPlan(preselectedPlan);
+            }
+
+            if (prefill === '1') {
+                // Prefill with realistic randoms
+                var randomId = Math.floor(Math.random() * 100000);
+                document.getElementById('ph_username').value = 'user' + randomId;
+                document.getElementById('ph_email').value = 'user' + randomId + '@example.com';
+                document.getElementById('ph_password').value = 'Password123!';
+                document.getElementById('ph_password2').value = 'Password123!';
+                document.getElementById('ph_is_adult').checked = true;
             }
 
             document.querySelector('form').addEventListener('submit', function(event) {
