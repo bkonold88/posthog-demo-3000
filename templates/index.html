@@ -18,6 +18,8 @@
                 <h5 class="card-title">{{ movie.title }}</h5>
                 <p class="card-text">{{ movie.description }}</p>
                 <a href="/movie/{{ movie.id }}" class="btn btn-danger" accesskey="{{ movie.id }}">Watch Now</a>
+                <button class="btn btn-success ml-2" data-ph-purchase data-action-type="buy" data-price="14.99" data-currency="USD" data-movie-id="{{ movie.id }}" data-movie-title="{{ movie.title }}">Buy $14.99</button>
+                <button class="btn btn-outline-success ml-2" data-ph-purchase data-action-type="rent" data-price="4.99" data-currency="USD" data-movie-id="{{ movie.id }}" data-movie-title="{{ movie.title }}">Rent $4.99</button>
             </div>
         </div>
     </div>
@@ -34,6 +36,8 @@
                 <h5 class="card-title">{{ movie.title }}</h5>
                 <p class="card-text">{{ movie.description }}</p>
                 <a href="/movie/{{ movie.id }}" class="btn btn-danger" accesskey="{{ movie.id }}">Watch Now</a>
+                <button class="btn btn-success ml-2" data-ph-purchase data-action-type="buy" data-price="14.99" data-currency="USD" data-movie-id="{{ movie.id }}" data-movie-title="{{ movie.title }}">Buy $14.99</button>
+                <button class="btn btn-outline-success ml-2" data-ph-purchase data-action-type="rent" data-price="4.99" data-currency="USD" data-movie-id="{{ movie.id }}" data-movie-title="{{ movie.title }}">Rent $4.99</button>
             </div>
         </div>
     </div>

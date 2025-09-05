@@ -123,6 +123,35 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.4.0/dist/confetti.browser.min.js"></script>
     <script src="{{ url_for('static', filename='js/confetti.js') }}"></script>
+    <script>
+        // Global handler for Buy/Rent buttons to capture revenue events
+        document.addEventListener('click', function(e) {
+            var target = e.target;
+            if (!target) { return; }
+            if (target.matches('[data-ph-purchase]')) {
+                try {
+                    var movieId = target.getAttribute('data-movie-id');
+                    var movieTitle = target.getAttribute('data-movie-title');
+                    var actionType = target.getAttribute('data-action-type'); // buy | rent
+                    var price = parseFloat(target.getAttribute('data-price')) || 0; // dollars
+                    var currency = target.getAttribute('data-currency') || 'USD';
+
+                    // Convert to minor units per PostHog revenue analytics docs
+                    var valueMinorUnits = Math.round(price * 100);
+
+                    posthog.capture('movie_' + actionType, {
+                        movie_id: movieId,
+                        movie_title: movieTitle,
+                        action: actionType,
+                        value: valueMinorUnits,
+                        currency: currency
+                    });
+                } catch (err) {
+                    // no-op
+                }
+            }
+        }, false);
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
