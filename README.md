@@ -32,7 +32,7 @@ python dummy_data.py
 
 This only needs to be done the first time you run the app.
 
-Next, set your PostHog Host and Project API key as environment variables. You can either rename `.env.example` to `.env` and update the placeholder variables therein, or run the following:
+Next, set your PostHog Host and Project API key as environment variables. You can either rename `.env.example` to `.env` and update the placeholder variables therein (recommended), or run the following:
 
 ```bash
 export PH_HOST='https://<eu or us>.i.posthog.com'
@@ -46,6 +46,12 @@ python app.py
 ```
 
 If you open up a browser and head to `http://127.0.0.1:5000/`, you'll see the HogFlix app running. Use `Ctrl + C` in your terminal to stop the app.
+
+Alternatively, after updating `.env`, you can use the Makefile to bootstrap everything in one step:
+
+```bash
+make run
+```
 
 ### Option 2 - Run as a Container with Docker
 
@@ -65,6 +71,22 @@ docker run -d -p 5000:5000 -e PH_PROJECT_KEY=<Project API key> -e PH_HOST='https
 
 You can then access the app on `localhost:5000`.
 
+### Optional: Enable the built-in Chat (LLM) demo
+
+If you set an OpenAI API key, the app will enable a simple chat interface that is instrumented with PostHog LLM Analytics (Generations and Traces). This lets you explore the LLM Analytics features alongside the seeded demo data.
+
+1. Add the following to your `.env`:
+
+```
+OPENAI_API_KEY='<OpenAI API key>'
+```
+
+2. Ensure your PostHog environment variables are set as above. The chat will appear in the navbar as “Chat” when `OPENAI_API_KEY` is present.
+
+Notes:
+- The app will attempt to use the PostHog-instrumented OpenAI client automatically. If unavailable, it will fall back to the standard OpenAI client while still capturing a `$ai_generation` event per message.
+- Models: defaults to `gpt-4o-mini`. You can change this in `app.py`.
+
 ### Option 3 - Run in GitHub Codespaces
 
 For a seamless setup, you can run the demo entirely in your browser using **GitHub Codespaces**. This avoids needing to manage Python or Docker on your local machine.
@@ -77,29 +99,36 @@ To get started:
 
 This will create a virtual environment in your browser where you can run the app and make changes. It may take a few minutes for the environment to configure, but once done, everything will be set up automatically.
 
-Once the environment is ready, follow these steps:
-1. Copy the contents of `.env.example` and create a new `.env` file.
-2. Set the required environment variables, including your **PostHog Project API Key**.
-3. Run the app:
-   ```bash
-   python app.py
-   ```
+On creation, the devcontainer will:
 
-Now you can demo **HogFlix** entirely in your browser without switching between local environments or desktop apps.
+- Install dependencies
+- Create `.env` from `.env.example`
+
+Next steps (one-time):
+1) Open `.env` and replace the placeholder values for:
+   - `PH_HOST`
+   - `PH_PROJECT_KEY`
+   - `PH_PERSONAL_API_KEY`
+   - `PH_PROJECT_ID`
+2) Run the app and bootstrap everything in one step:
+```bash
+make run
+```
+This will verify your `.env` is updated, initialize the local DB, seed historical data into PostHog, create demo artifacts in your project, and then start the app.
 
 ## Seed Historic Usage Data
 
 To generate valuable insights in your PostHog project, you'll need to add some historic event data. The `seed_demo_data.py` script creates pseudo-random data that mimics real usage of the HogFlix app. You'll need the `500_names_and_emails.csv` in your `scripts` folder (see below on how to generate this), and then run:
 
 ```bash
-python scripts/seed_demo_data.py -k <Project API Key> -p https://<eu or us>.i.posthog.com -d 30 -i 100
+make seed DAYS=30 ITER=100
 ```
 
-The input parameters are:
-- `-k`: The Project API key for your demo project.
-- `-h`: The PostHog Host.
-- `-d`: The number of previous days to generate data over (optional, defaults to 30).
-- `-i`: The number of iterations for the script (optional, defaults to 100).
+The seeding script will read `PH_PROJECT_KEY` and `PH_HOST` from either your environment or your `.env`. You can still pass `-k` and `-p` flags explicitly if you prefer.
+
+Parameters:
+- `-d`: Number of previous days to generate (default 30)
+- `-i`: Number of iterations (default 100)
 
 After a few minutes, you'll see newly created events and people in your PostHog project.
 
@@ -115,12 +144,13 @@ Once historic data has been generated, you'll need some PostHog artifacts to vie
 You'll need a **Personal API Key** (available in `/settings/user-api-keys` in the PostHog UI) to run this script:
 
 ```bash
-python scripts/create_posthog_artifacts.py -p "https://<eu or us>.posthog.com/api/projects/<project id>" -k "<Personal API Key>"
+make artifacts
 ```
-
-The input parameters are:
-- `-k`: Your Personal API key.
-- `-p`: The API Endpoint for your PostHog Project.
+This script now reads `PH_PERSONAL_API_KEY`, `PH_HOST`, and `PH_PROJECT_ID` from your `.env`.
+Optional flags (overrides env when provided):
+- `-k`: Personal API key
+- `-p`: API base URL (e.g. `https://us.posthog.com/api/projects/<project id>`) 
+- `--project_id`: Project ID (used to derive API URL when `-p` not provided)
 
 ## Recreate the Seed Data
 
@@ -129,6 +159,19 @@ The `500_names_and_emails.csv` file in the `scripts/` folder contains dummy data
 ```bash
 python scripts/generate_fake_names_and_emails.py
 ```
+
+## Makefile Shortcuts
+
+Common tasks are wrapped in a `Makefile`:
+
+- `make install`: Install dependencies
+- `make env`: Create `.env` from example
+- `make check-env`: Verify `.env` placeholders have been replaced
+- `make db`: Initialize and seed local DB
+- `make run`: Verify env, init DB, seed data, create artifacts, run app
+- `make seed`: Seed historical events to PostHog (reads `PH_*` from `.env`; flags optional)
+- `make artifacts`: Create PostHog demo artifacts (reads `PH_*` from `.env`; idempotent)
+- `make test`: Run tests
 
 Then copy the generated file back to the `scripts/` folder to generate more demo data.
 

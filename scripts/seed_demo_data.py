@@ -5,6 +5,9 @@ from argparse import ArgumentParser
 import random
 import csv
 from argparse import ArgumentParser
+from pathlib import Path
+import os
+from dotenv import load_dotenv
 
 days_to_generate = 30
 number_of_iterations = 100
@@ -15,10 +18,23 @@ parser.add_argument("-d", "--number_of_days",
 parser.add_argument("-i", "--number_of_iterations",
                     help="Number of iterations of the data generator",default=100, required=False)
 parser.add_argument("-k", "--posthog_api_key",
-                    help="PostHog Project API Key", required=True)
+                    help="PostHog Project API Key", required=False)
 parser.add_argument("-p", "--posthog_host",
-                    help="PostHog Host", required=True)
+                    help="PostHog Host", required=False)
 args = parser.parse_args()
+
+# Load .env from project root to support Codespaces/devcontainer auto-creation
+project_root_env = Path(__file__).resolve().parents[1] / '.env'
+if project_root_env.exists():
+  load_dotenv(dotenv_path=project_root_env)
+
+# Fallback to environment variables if CLI params not provided
+if not args.posthog_api_key:
+  args.posthog_api_key = os.getenv("PH_PROJECT_KEY")
+if not args.posthog_host:
+  args.posthog_host = os.getenv("PH_HOST")
+if not args.posthog_api_key or not args.posthog_host:
+  raise SystemExit("PH_PROJECT_KEY and PH_HOST must be provided via flags or environment variables.")
 
 # PostHog Python Client
 posthog = Posthog(args.posthog_api_key, 
@@ -30,7 +46,8 @@ posthog = Posthog(args.posthog_api_key,
 
 fake = Faker() 
 
-with open('500_names_and_emails.csv', newline='') as csvfile:
+csv_path = Path(__file__).resolve().parent / '500_names_and_emails.csv'
+with open(csv_path, newline='') as csvfile:
     csvreader = csv.DictReader(csvfile, delimiter=',')
     fake_users = [row for row in csvreader]
 
@@ -76,6 +93,16 @@ device_properties = [
     }]
 
 plans = ['Free', 'Premium', 'Max-imal']
+
+# Simple catalog mirror of pop_db.py entries for titles
+movies_catalog = {
+  1: {"title": "Code & Quills"},
+  2: {"title": "Palette of Prickles"},
+  3: {"title": "Data Spikes"},
+  4: {"title": "Fists of Fury"},
+  5: {"title": "Spikes & Consequences"},
+  6: {"title": "The Hedge Abides"}
+}
 
 def get_random_time():
     random_seconds = random.randint(0,int(args.number_of_days) * 86400)
@@ -167,6 +194,45 @@ def browse_and_watch_movie(number = 1):
 
         capture_pageview(url=f'https://hogflix.net/movie/{movie_id}', client_properties = client_properties, timestamp=timestamp, distinct_id = distinct_id, groups=groups)
 
+        # Simulate occasional revenue events
+        if random.randrange(100) < 25:
+            action_type = random.choice(['buy','rent'])
+            price = 14.99 if action_type == 'buy' else 4.99
+            value_minor = int(round(price * 100))
+            movie_title = movies_catalog.get(movie_id, {}).get('title', f'Movie {movie_id}')
+
+            # Intent event (no revenue aggregation)
+            capture_event(
+               event=f'movie_{action_type}_intent',
+               extra_properties={
+                  **client_properties,
+                  "movie_id": movie_id,
+                  "movie_title": movie_title,
+                  "action": action_type,
+                  "price": price,
+                  "currency": "USD",
+               },
+               timestamp=timestamp + timedelta(minutes=1),
+               distinct_id=distinct_id,
+               groups=groups,
+            )
+
+            # Complete event with value and currency for Revenue Analytics
+            capture_event(
+               event=f'movie_{action_type}_complete',
+               extra_properties={
+                  **client_properties,
+                  "movie_id": movie_id,
+                  "movie_title": movie_title,
+                  "action": action_type,
+                  "value": value_minor,
+                  "currency": "USD",
+               },
+               timestamp=timestamp + timedelta(minutes=2),
+               distinct_id=distinct_id,
+               groups=groups,
+            )
+
 def anon_browse_homepage_and_plans():
    client_properties = get_client_properties()
    distinct_id = fake.uuid4()
@@ -223,6 +289,27 @@ def browse_plans_and_signup():
                         }}
    print(client_properties)
    capture_event(event='plan_changed', extra_properties=client_properties, timestamp=timestamp, distinct_id=distinct_id, groups=groups)
+
+   # Emit subscription intent and purchase for Revenue Analytics
+   months = 1
+   price_dollars = 19.99 if new_plan == 'Max-imal' else 9.99 if new_plan == 'Premium' else 0
+   timestamp = timestamp + timedelta(minutes=1)
+   capture_event(event='subscription_intent', extra_properties={
+      **client_properties,
+      'plan': new_plan,
+      'months': months,
+      'price': int(round(price_dollars * 100)),
+      'currency': 'USD',
+   }, timestamp=timestamp, distinct_id=distinct_id, groups=groups)
+
+   timestamp = timestamp + timedelta(minutes=1)
+   capture_event(event='subscription_purchased', extra_properties={
+      **client_properties,
+      'plan': new_plan,
+      'months': months,
+      'price': int(round(price_dollars * 100)),
+      'currency': 'USD',
+   }, timestamp=timestamp, distinct_id=distinct_id, groups=groups)
 
 for i in range(int(args.number_of_iterations)):
    print(args)

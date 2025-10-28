@@ -18,6 +18,8 @@
                 <h5 class="card-title">{{ movie.title }}</h5>
                 <p class="card-text">{{ movie.description }}</p>
                 <a href="/movie/{{ movie.id }}" class="btn btn-danger" accesskey="{{ movie.id }}">Watch Now</a>
+                <button class="btn btn-success ml-2" data-ph-purchase data-action-type="buy" data-price="14.99" data-currency="USD" data-movie-id="{{ movie.id }}" data-movie-title="{{ movie.title }}">Buy $14.99</button>
+                <button class="btn btn-outline-success ml-2" data-ph-purchase data-action-type="rent" data-price="4.99" data-currency="USD" data-movie-id="{{ movie.id }}" data-movie-title="{{ movie.title }}">Rent $4.99</button>
             </div>
         </div>
     </div>
@@ -34,13 +36,15 @@
                 <h5 class="card-title">{{ movie.title }}</h5>
                 <p class="card-text">{{ movie.description }}</p>
                 <a href="/movie/{{ movie.id }}" class="btn btn-danger" accesskey="{{ movie.id }}">Watch Now</a>
+                <button class="btn btn-success ml-2" data-ph-purchase data-action-type="buy" data-price="14.99" data-currency="USD" data-movie-id="{{ movie.id }}" data-movie-title="{{ movie.title }}">Buy $14.99</button>
+                <button class="btn btn-outline-success ml-2" data-ph-purchase data-action-type="rent" data-price="4.99" data-currency="USD" data-movie-id="{{ movie.id }}" data-movie-title="{{ movie.title }}">Rent $4.99</button>
             </div>
         </div>
     </div>
     {% endfor %}
 </div>
 
-<div id="signup-modal" class="modal" style="display: none;">
+<div id="signup-modal" class="signup-modal" style="display: none;">
     <div class="modal-content">
         <h2>Message from our Co-Founder James H.</h2>
         <p>I suggest you sign up for our premium Max-imal plan!</p>
@@ -51,7 +55,7 @@
 </div>
 
 <style>
-    .modal {
+    .signup-modal {
         display: none;
         position: fixed;
         z-index: 1000;
@@ -65,7 +69,7 @@
         align-items: center;
     }
 
-    .modal-content {
+    .signup-modal .modal-content {
         background-color: #111;
         color: white;
         padding: 40px;

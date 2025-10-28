@@ -1,11 +1,13 @@
 from faker import Faker
 import csv
 import random
+from pathlib import Path
 fake = Faker()
 
 last_names = [fake.unique.last_name() for i in range(100)]
 
-with open('500_names_and_emails.csv', 'w', newline='') as csvfile:
+output_path = Path(__file__).resolve().parent / '500_names_and_emails.csv'
+with open(output_path, 'w', newline='') as csvfile:
     csvwriter = csv.writer(csvfile, delimiter=',')
     csvwriter.writerow(['last_name','family_id','email','ip','plan','is_adult'])
     for i in range(500):

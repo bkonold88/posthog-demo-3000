@@ -13,6 +13,7 @@ class Config:
     PH_HOST = os.getenv('PH_HOST', 'https://us.i.posthog.com')
     APP_HOST = os.getenv('APP_HOST', 'http://localhost')
     APP_PORT = os.getenv('APP_PORT', 5000)
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 
 class DevelopmentConfig(Config):
     DEBUG = True

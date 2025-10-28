@@ -1,6 +1,7 @@
 import logging
+import uuid
 from datetime import datetime
-from flask import Flask, render_template, redirect, url_for, flash, request, jsonify, make_response
+from flask import Flask, render_template, redirect, url_for, flash, request, jsonify, make_response, session
 from config import DevelopmentConfig
 from models import db, User, Movie, MovieStats, BlogPost
 from forms import SignupForm, LoginForm, ChangePlanForm, BlogPostForm
@@ -27,6 +28,34 @@ migrate = Migrate(app, db)
 login = LoginManager(app)
 login.login_view = 'login'
 
+# --- LLM Chat setup (enabled when OPENAI_API_KEY is set) ---
+chat_enabled = bool(app.config.get('OPENAI_API_KEY'))
+openai_client = None
+openai_instrumented = False
+langchain_available = False
+if chat_enabled:
+    # Prefer LangChain for chat; fall back to direct OpenAI client
+    try:
+        from langchain_openai import ChatOpenAI  # type: ignore
+        from langchain_core.messages import SystemMessage, HumanMessage, AIMessage  # type: ignore
+        from posthog.ai.langchain import CallbackHandler  # type: ignore
+        langchain_available = True
+    except Exception:
+        langchain_available = False
+
+    if not langchain_available:
+        try:
+            from posthog.ai.openai import OpenAI as PHOpenAI  # type: ignore
+            openai_client = PHOpenAI(api_key=app.config['OPENAI_API_KEY'], posthog_client=posthog)
+            openai_instrumented = True
+        except Exception:
+            try:
+                from openai import OpenAI as RawOpenAI  # type: ignore
+                openai_client = RawOpenAI(api_key=app.config['OPENAI_API_KEY'])
+            except Exception:
+                openai_client = None
+                chat_enabled = False
+
 @login.user_loader
 def load_user(id):
     return User.query.get(int(id))
@@ -40,7 +69,8 @@ def index():
     response = make_response(render_template(
         'index.html',
         family_movies=family_movies,
-        action_movies=action_movies
+        action_movies=action_movies,
+        chat_enabled=chat_enabled
     ))
 
     response.delete_cookie('posthog_js')
@@ -92,13 +122,21 @@ def signup():
                     'date_time': formatted_time
                 }
             )
-            posthog.capture(form.email.data, 
-                event= "plan_purchase", 
-                properties = {
-                    'plan': plan,
-                    'amount': PLAN_PRICES.get(plan, 0)  # Returns 0 if plan not found
-                }
-            )
+            # Subscription purchase event for Revenue Analytics
+            try:
+                months = 1
+                price_dollars = PLAN_PRICES.get(plan, 0)
+                posthog.capture(form.email.data,
+                    event='subscription_purchased',
+                    properties={
+                        'plan': plan,
+                        'months': months,
+                        'price': int(round(price_dollars * 100)),
+                        'currency': 'USD'
+                    }
+                )
+            except Exception:
+                pass
             flash('Congratulations, you are now a registered user!')
             return redirect(url_for('login'))
         else:
@@ -254,6 +292,122 @@ def toc():
 @login_required  # Optional: restrict to logged-in users only
 def feature_flags():
     return render_template('feature_flags.html')
+
+# --- Chat routes ---
+@app.route('/chat', methods=['GET'])
+def chat_page():
+    if not chat_enabled:
+        return redirect(url_for('index'))
+    return render_template('chat.html', chat_enabled=chat_enabled)
+
+
+@app.route('/chat', methods=['POST'])
+@csrf.exempt
+def chat_api():
+    if not chat_enabled:
+        return jsonify({ 'error': 'Chat disabled' }), 400
+
+    user_message = (request.get_json() or {}).get('message') or request.form.get('message')
+    if not user_message:
+        return jsonify({ 'error': 'Message required' }), 400
+
+    # Establish a stable conversation id for analytics and memory
+    if 'conversation_id' not in session:
+        session['conversation_id'] = uuid.uuid4().hex
+    conversation_id = session['conversation_id']
+
+    distinct_id = current_user.email if current_user.is_authenticated else request.remote_addr or 'anonymous'
+
+    try:
+        ai_text = None
+        if 'history' not in session:
+            session['history'] = []
+
+        if langchain_available:
+            # Build chat history for LangChain
+            lc_messages = [
+                SystemMessage(content=(
+                    "You are HogFlix's helpful assistant. Keep answers concise and use GitHub-Flavored Markdown. "
+                    "When appropriate, include code blocks fenced with the correct language."
+                ))
+            ]
+            for m in session['history']:
+                role = m.get('role')
+                content = m.get('content')
+                if role == 'user':
+                    lc_messages.append(HumanMessage(content=content))
+                elif role == 'assistant':
+                    lc_messages.append(AIMessage(content=content))
+            lc_messages.append(HumanMessage(content=user_message))
+
+            model = ChatOpenAI(
+                model="gpt-4o-mini",
+                api_key=app.config['OPENAI_API_KEY'],
+                temperature=0.2,
+            )
+
+            # PostHog LangChain callback for detailed analytics
+            try:
+                callback_handler = CallbackHandler(
+                    client=posthog,
+                    distinct_id=distinct_id,
+                    trace_id=conversation_id,
+                    properties={"conversation_id": conversation_id},
+                )
+                result = model.invoke(lc_messages, config={"callbacks": [callback_handler]})
+            except Exception:
+                result = model.invoke(lc_messages)
+
+            ai_text = getattr(result, 'content', None) or str(result)
+        else:
+            if openai_client is None:
+                return jsonify({ 'error': 'Chat disabled' }), 400
+            # Fallback to direct OpenAI client
+            if hasattr(openai_client, 'responses'):
+                resp = openai_client.responses.create(
+                    model="gpt-4o-mini",
+                    input=[{"role": "user", "content": user_message}],
+                    **({"posthog_distinct_id": distinct_id} if openai_instrumented else {})
+                )
+                try:
+                    ai_text = resp.output_text
+                except Exception:
+                    choice = getattr(resp, 'choices', [{}])[0] if hasattr(resp, 'choices') else None
+                    ai_text = (choice.get('message', {}) or {}).get('content') if isinstance(choice, dict) else None
+            else:
+                completion = openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": user_message}],
+                )
+                ai_text = completion.choices[0].message.content
+
+        if not ai_text:
+            ai_text = "(no response)"
+
+        # Update session history
+        session['history'].append({"role": "user", "content": user_message})
+        session['history'].append({"role": "assistant", "content": ai_text})
+
+        # Capture a basic generation event for visibility even without wrapper
+        try:
+            posthog.capture(
+                distinct_id,
+                event='$ai_generation',
+                properties={
+                    '$ai_model': 'gpt-4o-mini',
+                    '$ai_provider': 'openai',
+                    '$ai_input': user_message,
+                    '$ai_output': ai_text,
+                    '$ai_trace_id': conversation_id,
+                }
+            )
+        except Exception:
+            pass
+
+        return jsonify({ 'message': ai_text })
+    except Exception as e:
+        app.logger.exception('Chat API error')
+        return jsonify({ 'error': 'Failed to generate response' }), 500
 
 if __name__ == '__main__':
     # app.run(debug=True, host=app.config['APP_HOST'], port=app.config['APP_PORT'])
