@@ -5,6 +5,7 @@ instance
 migration
 /__pycache__/
 /venv/
+.venv/
 *.pyc
 *.pyo
 *.pyd

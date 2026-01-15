@@ -1,0 +1,42 @@
+[project]
+name = "hogflix-demo"
+version = "1.0.0"
+description = "HogFlix Demo 3000 - A PostHog demo application"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "alembic>=1.13.2",
+    "backoff>=2.2.1",
+    "bcrypt>=4.2.0",
+    "beautifulsoup4>=4.12.3",
+    "bs4>=0.0.2",
+    "email-validator>=2.2.0",
+    "faker>=27.0.0",
+    "flask>=3.0.3",
+    "flask-login>=0.6.3",
+    "flask-migrate>=4.0.7",
+    "flask-sqlalchemy>=3.1.1",
+    "flask-wtf>=1.2.1",
+    "gunicorn>=21.1.0",
+    "langchain>=0.2.12",
+    "langchain-community>=0.2.12",
+    "langchain-openai>=0.1.22",
+    "openai>=1.40.0",
+    "posthog>=3.5.0",
+    "pymysql>=1.1.1",
+    "python-dotenv>=1.0.1",
+    "requests>=2.31.0",
+    "slack-bolt>=1.18.1",
+    "slack-sdk>=3.27.1",
+    "sqlalchemy>=2.0.32",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.2",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.2",
+]
