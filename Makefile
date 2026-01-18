@@ -1,4 +1,4 @@
-SHELL := /usr/bin/bash
+SHELL := /bin/bash
 
 .PHONY: help install env env-reset db run seed artifacts test lint clean check-env
 
@@ -14,8 +14,7 @@ help:
 	@echo "  make test       - Run tests"
 
 install:
-	python -m pip install -U pip
-	pip install -r requirements.txt
+	uv sync
 
 env:
 	@if [ ! -f .env ]; then cp .env.example .env; fi
@@ -30,20 +29,20 @@ check-env:
 	@grep -q "PH_PROJECT_ID='<Project Id>'" .env && { echo "Please update PH_PROJECT_ID in .env"; exit 1; } || true
 
 db:
-	python pop_db.py
-	python dummy_data.py
+	uv run python pop_db.py
+	uv run python dummy_data.py
 
 run: check-env db seed artifacts
-	python app.py
+	uv run python app.py
 
 seed:
-	python scripts/seed_demo_data.py -d $${DAYS:-30} -i $${ITER:-100}
+	uv run python scripts/seed_demo_data.py -d $${DAYS:-30} -i $${ITER:-100}
 
 artifacts:
-	python scripts/create_posthog_artifacts.py
+	uv run python scripts/create_posthog_artifacts.py
 
 test:
-	pytest -q
+	uv run pytest -q
 
 clean:
 	rm -f hogflix.sqlite
