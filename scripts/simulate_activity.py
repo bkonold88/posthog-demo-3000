@@ -67,3 +67,4 @@ for i in range(50):
     simulate_event()
     time.sleep(2)
 print("Simulation complete!")
+posthog.shutdown()
