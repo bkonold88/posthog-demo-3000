@@ -1,0 +1,22 @@
+name: Daily PostHog Simulation
+
+on:
+  schedule:
+    - cron: '0 14 * * *'  # Runs daily at 9am CST
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install posthog python-dotenv
+      - name: Run simulation
+        env:
+          PH_PROJECT_KEY: ${{ secrets.PH_PROJECT_KEY }}
+          PH_HOST: ${{ secrets.PH_HOST }}
+        run: python scripts/simulate_activity.py
